@@ -10,6 +10,7 @@ use fantoccini::ClientBuilder;
 use std::{borrow::Cow, time::Duration};
 use tokio::net::TcpListener;
 use tokio::time::sleep;
+use tracing::{Instrument, trace, trace_span};
 use url::{Host, Url, form_urlencoded};
 
 const CLIENT_ID: &str = "9e5f94bc-e8a4-4e73-b8be-63364c29d753";
@@ -24,7 +25,8 @@ async fn main() -> Result<()> {
             "/authorize",
             get(
                 async |OriginalUri(original_uri): OriginalUri| -> axum::response::Result<Redirect> {
-                    let redirect = authorize(original_uri)
+                    let redirect = authorize(&original_uri)
+                        .instrument(trace_span!("/authorize", ?original_uri))
                         .await
                         .map_err(|err| err.to_string())?;
 
@@ -40,16 +42,9 @@ async fn main() -> Result<()> {
                         .map(front_params)
                         .collect::<Vec<_>>();
 
-                    let response = reqwest::Client::new()
-                        .post("https://login.microsoftonline.com/common/oauth2/v2.0/token")
-                        .form(&query)
-                        .send()
+                    let response = exchange_token(&query)
+                        .instrument(trace_span!("/token", ?query))
                         .await
-                        .context("send upstream")
-                        .map_err(|err| err.to_string())?
-                        .text()
-                        .await
-                        .context("read upstream response")
                         .map_err(|err| err.to_string())?;
 
                     Ok(response)
@@ -66,7 +61,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn authorize(original_uri: Uri) -> Result<Url> {
+async fn authorize(original_uri: &Uri) -> Result<Url> {
     let mut upstream_url =
         Url::parse("https://login.microsoftonline.com/common/oauth2/v2.0/authorize")
             .expect("valid upstream url");
@@ -117,6 +112,8 @@ async fn authorize(original_uri: Uri) -> Result<Url> {
 
     c.close().await.context("close WebDriver connection")?;
 
+    trace!("redirect to {}", redirect);
+
     Ok(redirect)
 }
 
@@ -128,4 +125,20 @@ fn front_params((k, v): (Cow<'_, str>, Cow<'_, str>)) -> (String, String) {
     };
 
     (k.into_owned(), fronted)
+}
+
+async fn exchange_token(query: &Vec<(String, String)>) -> Result<String> {
+    let response = reqwest::Client::new()
+        .post("https://login.microsoftonline.com/common/oauth2/v2.0/token")
+        .form(query)
+        .send()
+        .await
+        .context("send upstream")?
+        .text()
+        .await
+        .context("read upstream response")?;
+
+    trace!("response {}", response);
+
+    Ok(response)
 }

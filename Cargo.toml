@@ -11,5 +11,6 @@ fantoccini = "0.22"
 reqwest = {version ="0.12", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tracing = "0.1"
 tracing-subscriber = "0.3"
 url = "2"
