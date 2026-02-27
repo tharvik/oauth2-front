@@ -8,9 +8,9 @@ anyhow = "1"
 axum = { version = "0.8", features = ["original-uri"] }
 clap = { version = "4", features = ["derive"] }
 fantoccini = "0.22"
-reqwest = {version ="0.12", features = ["json"] }
+reqwest = { version = "0.13", features = ["form", "json"] }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
-url = "2"
+url = { version = "2", features = ["serde"] }
